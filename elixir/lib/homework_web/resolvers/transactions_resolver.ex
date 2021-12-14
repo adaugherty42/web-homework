@@ -7,7 +7,8 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   Get a list of transcations
   """
   def transactions(_root, args, _info) do
-    {:ok, Transactions.list_transactions(args)}
+    txs = Transactions.list_transactions(args) |> Enum.map(&cents_to_dollars/1)
+    {:ok, txs}
   end
 
   @doc """
@@ -28,9 +29,9 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   Create a new transaction
   """
   def create_transaction(_root, args, _info) do
-    case Transactions.create_transaction(args) do
+    case Transactions.create_transaction(dollars_to_cents(args)) do
       {:ok, transaction} ->
-        {:ok, transaction}
+        {:ok, cents_to_dollars(transaction)}
 
       error ->
         {:error, "could not create transaction: #{inspect(error)}"}
@@ -43,9 +44,9 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   def update_transaction(_root, %{id: id} = args, _info) do
     transaction = Transactions.get_transaction!(id)
 
-    case Transactions.update_transaction(transaction, args) do
+    case Transactions.update_transaction(transaction, dollars_to_cents(args)) do
       {:ok, transaction} ->
-        {:ok, transaction}
+        {:ok, cents_to_dollars(transaction)}
 
       error ->
         {:error, "could not update transaction: #{inspect(error)}"}
@@ -65,5 +66,13 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
       error ->
         {:error, "could not update transaction: #{inspect(error)}"}
     end
+  end
+
+  defp cents_to_dollars(%{amount: cents}=tx) do
+    %{tx| amount: cents / 100}
+  end
+
+  defp dollars_to_cents(%{amount: dollars}=query) do
+    %{query| amount: trunc(dollars * 100)}
   end
 end
