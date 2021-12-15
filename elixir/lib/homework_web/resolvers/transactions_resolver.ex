@@ -69,10 +69,10 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   end
 
   defp cents_to_dollars(%{amount: cents}=tx) do
-    %{tx| amount: cents / 100}
+    %{tx| amount: Decimal.div(cents, 100) |> Decimal.round(2)}
   end
 
   defp dollars_to_cents(%{amount: dollars}=query) do
-    %{query| amount: trunc(dollars * 100)}
+    %{query| amount: Decimal.mult(Decimal.round(dollars,2), 100) |> Decimal.to_integer()}
   end
 end
