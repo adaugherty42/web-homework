@@ -2,13 +2,13 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   alias Homework.Merchants
   alias Homework.Transactions
   alias Homework.Users
+  alias Homework.Companies
 
   @doc """
   Get a list of transcations
   """
   def transactions(_root, args, _info) do
-    txs = Transactions.list_transactions(args) |> Enum.map(&cents_to_dollars/1)
-    {:ok, txs}
+    {:ok, Transactions.list_transactions(args)}
   end
 
   @doc """
@@ -26,27 +26,34 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   end
 
   @doc """
+  Get the company associated with a transaction
+  """
+  def company(_root, _args, %{source: %{company_id: company_id}}) do
+    {:ok, Companies.get_company!(company_id)}
+  end
+
+  @doc """
   Create a new transaction
   """
   def create_transaction(_root, args, _info) do
-    case Transactions.create_transaction(dollars_to_cents(args)) do
-      {:ok, transaction} ->
-        {:ok, cents_to_dollars(transaction)}
+      case Transactions.create_transaction(args) do
+        {:ok, transaction} ->
+          {:ok, transaction}
 
-      error ->
-        {:error, "could not create transaction: #{inspect(error)}"}
-    end
+        error ->
+          {:error, "could not create transaction: #{inspect(error)}"}
+      end
   end
 
   @doc """
   Updates a transaction for an id with args specified.
   """
-  def update_transaction(_root, %{id: id} = args, _info) do
+  def update_transaction(_root, %{id: id}=args, _info) do
     transaction = Transactions.get_transaction!(id)
 
-    case Transactions.update_transaction(transaction, dollars_to_cents(args)) do
+    case Transactions.update_transaction(transaction, args) do
       {:ok, transaction} ->
-        {:ok, cents_to_dollars(transaction)}
+        {:ok, transaction}
 
       error ->
         {:error, "could not update transaction: #{inspect(error)}"}
@@ -66,13 +73,5 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
       error ->
         {:error, "could not update transaction: #{inspect(error)}"}
     end
-  end
-
-  defp cents_to_dollars(%{amount: cents}=tx) do
-    %{tx| amount: Decimal.div(cents, 100) |> Decimal.round(2)}
-  end
-
-  defp dollars_to_cents(%{amount: dollars}=query) do
-    %{query| amount: Decimal.mult(Decimal.round(dollars,2), 100) |> Decimal.to_integer()}
   end
 end
