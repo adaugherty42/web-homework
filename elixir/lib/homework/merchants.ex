@@ -17,8 +17,10 @@ defmodule Homework.Merchants do
       [%Merchant{}, ...]
 
   """
-  def list_merchants(_args) do
-    Repo.all(Merchant)
+  def list_merchants(params) do
+    base_query()
+    |> build_query(params)
+    |> Repo.all()
   end
 
   @doc """
@@ -100,5 +102,17 @@ defmodule Homework.Merchants do
   """
   def change_merchant(%Merchant{} = merchant, attrs \\ %{}) do
     Merchant.changeset(merchant, attrs)
+  end
+
+  defp base_query do
+    from m in Merchant
+  end
+
+  defp build_query(query, criteria) do
+    Enum.reduce(criteria, query, &compose_query/2)
+  end
+
+  defp compose_query({:name, name}, query) do
+    where(query, [m], ilike(m.name, ^"%#{name}%"))
   end
 end

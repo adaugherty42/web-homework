@@ -6,9 +6,11 @@ defmodule Homework.Companies do
   import Ecto.Query, warn: false
   alias Homework.Repo
   alias Homework.Companies.Company
+  alias Homework.Util.Transforms
 
   def list_companies(_args) do
-    Repo.all(from c in Company, preload: [:transactions]) |> Enum.map(&cents_to_dollars/1) |> Enum.map(&calculate_available_credit/1)
+    Repo.all(from c in Company, preload: [:transactions])
+    |> Enum.map(&process_company/1)
   end
 
   @doc """
@@ -17,7 +19,9 @@ defmodule Homework.Companies do
     Raises `Ecto.NoResultsError` if the Company does not exist.
   """
   def get_company!(id) do
-    Repo.get!(Company, id) |> Repo.preload([:transactions]) |> cents_to_dollars() |> calculate_available_credit()
+    Repo.get!(Company, id)
+    |> Repo.preload([:transactions])
+    |> process_company()
   end
 
   @doc """
@@ -25,14 +29,16 @@ defmodule Homework.Companies do
   """
   def create_company(attrs) do
     {code, res} = %Company{}
-    |> Company.changeset(dollars_to_cents(attrs))
+    |> Company.changeset(%{attrs| credit_line: Transforms.dollars_to_cents(attrs.credit_line)})
     |> Repo.insert()
 
     case code do
       :error ->
         {code, res}
       :ok ->
-        {code, res |> Repo.preload([:transactions]) |> cents_to_dollars() |> calculate_available_credit()}
+        {code, res
+              |> Repo.preload([:transactions])
+              |> process_company()}
     end
   end
 
@@ -41,7 +47,7 @@ defmodule Homework.Companies do
   """
   def update_company(%Company{} = company, attrs) do
     {code, res} = company
-    |> Company.changeset(dollars_to_cents(attrs))
+    |> Company.changeset(%{attrs| credit_line: Transforms.dollars_to_cents(attrs.credit_line)})
     |> Repo.update()
 
     case code do
@@ -49,7 +55,9 @@ defmodule Homework.Companies do
         {code,res}
 
       :ok ->
-        {code, res |> Repo.preload([:transactions]) |> cents_to_dollars() |> calculate_available_credit()}
+        {code, res
+              |> Repo.preload([:transactions])
+              |> process_company()}
     end
   end
 
@@ -60,12 +68,11 @@ defmodule Homework.Companies do
     Repo.delete(company)
   end
 
-  defp cents_to_dollars(%{credit_line: cents}=company) do
-    %{company| credit_line: Decimal.div(cents, 100) |> Decimal.round(2)}
-  end
-
-  defp dollars_to_cents(%{credit_line: dollars}=query) do
-    %{query| credit_line: Decimal.mult(Decimal.round(dollars,2), 100) |> Decimal.to_integer()}
+  defp process_company(company) do
+    company
+    |> (fn(c) -> %{c| transactions: Enum.map(c.transactions, fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end)} end).()
+    |> (fn(c) -> %{c| credit_line: Transforms.cents_to_dollars(c.credit_line)} end).()
+    |> calculate_available_credit()
   end
 
   # I gravitated toward a normalized database and ended up with this suboptimal approach. We pull
@@ -74,9 +81,9 @@ defmodule Homework.Companies do
   # where we just store available credit as a field in the companies table, and update it while
   # working with a transaction.
   defp calculate_available_credit(%{credit_line: amt}=company) do
-    txs_sum = company.transactions |> Enum.map(fn(tx) -> tx.amount end) |> Enum.sum()
+    txs_sum = Enum.reduce(company.transactions, Decimal.from_float(0.0), fn(t, curr) -> Decimal.add(t.amount, curr) end)
     # Credit line is already a decimal at this point
-    diff = Decimal.sub(amt, Decimal.div(txs_sum, 100) |> Decimal.round(2))
+    diff = Decimal.sub(amt, txs_sum)
     %{company| available_credit: diff}
   end
 end

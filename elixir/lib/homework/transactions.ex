@@ -8,6 +8,7 @@ defmodule Homework.Transactions do
 
   alias Homework.Transactions.Transaction
   alias Homework.Companies
+  alias Homework.Util.Transforms
 
   @doc """
   Returns the list of transactions.
@@ -18,8 +19,11 @@ defmodule Homework.Transactions do
       [%Transaction{}, ...]
 
   """
-  def list_transactions(_args) do
-    Repo.all(Transaction) |> Enum.map(&cents_to_dollars/1)
+  def list_transactions(params) do
+    base_query()
+    |> build_query(params)
+    |> Repo.all
+    |> Enum.map(fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end)
   end
 
   @doc """
@@ -36,7 +40,10 @@ defmodule Homework.Transactions do
       ** (Ecto.NoResultsError)
 
   """
-  def get_transaction!(id), do: Repo.get!(Transaction, id) |> cents_to_dollars()
+  def get_transaction!(id) do
+    Repo.get!(Transaction, id)
+    |> (fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end).()
+  end
 
   # I created this null guard function just to pass the invalid attrs test case, but a better
   # solution is needed here. This check is necessary because the Decimal library can't handle
@@ -44,7 +51,7 @@ defmodule Homework.Transactions do
   # to check for nil. There must be a better way to do this.
   def create_transaction(%{amount: nil}=attrs) do
     %Transaction{}
-    |> Transaction.changeset(dollars_to_cents(attrs))
+    |> Transaction.changeset(%{attrs| amount: Transforms.dollars_to_cents(attrs.amount)})
     |> Repo.insert()
   end
 
@@ -71,21 +78,21 @@ defmodule Homework.Transactions do
 
       _ ->
         {code, res} = %Transaction{}
-        |> Transaction.changeset(dollars_to_cents(attrs))
+        |> Transaction.changeset(%{attrs| amount: Transforms.dollars_to_cents(attrs.amount)})
         |> Repo.insert()
 
       case code do
         :error ->
           {code, res}
         :ok ->
-          {code, res |> cents_to_dollars()}
+          {code, res |> (fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end).()}
       end
     end
   end
 
   def update_transaction(%Transaction{} = transaction, %{amount: nil}=attrs) do
     transaction
-    |> Transaction.changeset(attrs)
+    |> Transaction.changeset(%{attrs| amount: Transforms.dollars_to_cents(attrs.amount)})
     |> Repo.update()
   end
 
@@ -102,12 +109,18 @@ defmodule Homework.Transactions do
 
   """
   def update_transaction(%Transaction{} = transaction, %{amount: new_amount}=attrs) do
-    cmpy = Companies.get_company!(transaction.company_id)
+
     # Credit the original transaction amount back to the available balance, and then charge the new amount.
     # If our available balance dips below zero, abort mission.
-    # NOTE: This is a starting point toward protecting against a negative balance, but it is not complete.
-    # It is possible for the transaction's company id to be switched, in which case this can potentially fail.
-    diff = Decimal.sub(Decimal.add(cmpy.available_credit, transaction.amount), Decimal.round(new_amount,2))
+    # However, we must also guard against the case when the transaction's company id is switched, in which case
+    # we simply want to deduct the transaction amount from this new company's available credit
+    diff =  if transaction.company_id == attrs.company_id do
+              cmpy = Companies.get_company!(transaction.company_id)
+              Decimal.sub(Decimal.add(cmpy.available_credit, transaction.amount), Decimal.round(new_amount,2))
+            else
+              new_cmpy = Companies.get_company!(attrs.company_id)
+              Decimal.sub(new_cmpy.available_credit, Decimal.round(new_amount,2))
+            end
 
     case Decimal.compare(diff, 0) do
       :lt ->
@@ -115,14 +128,14 @@ defmodule Homework.Transactions do
 
       _ ->
         {code, res} = transaction
-        |> Transaction.changeset(dollars_to_cents(attrs))
+        |> Transaction.changeset(%{attrs| amount: Transforms.dollars_to_cents(attrs.amount)})
         |> Repo.update()
 
         case code do
           :error ->
             {code, res}
           :ok ->
-            {code, res |> cents_to_dollars()}
+            {code, res |> (fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end).()}
       end
     end
   end
@@ -156,21 +169,21 @@ defmodule Homework.Transactions do
     Transaction.changeset(transaction, attrs)
   end
 
-  defp cents_to_dollars(%{amount: cents}=tx) do
-    case cents do
-      nil ->
-        tx
-      _ ->
-        %{tx| amount: Decimal.div(cents, 100) |> Decimal.round(2)}
-    end
+  defp base_query do
+    from t in Transaction
   end
 
-  defp dollars_to_cents(%{amount: dollars}=query) do
-    case dollars do
-      nil ->
-        query
-      _ ->
-        %{query| amount: Decimal.mult(Decimal.round(dollars,2), 100) |> Decimal.to_integer()}
-    end
+  defp build_query(query, criteria) do
+    Enum.reduce(criteria, query, &compose_query/2)
+  end
+
+  defp compose_query({:min_amount, min_amount}, query) do
+    amt = Transforms.dollars_to_cents(min_amount)
+    where(query, [t], ^amt <= t.amount)
+  end
+
+  defp compose_query({:max_amount, max_amount}, query) do
+    amt = Transforms.dollars_to_cents(max_amount)
+    where(query, [t], ^amt >= t.amount)
   end
 end

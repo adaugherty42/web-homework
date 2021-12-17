@@ -17,8 +17,10 @@ defmodule Homework.Users do
       [%User{}, ...]
 
   """
-  def list_users(_args) do
-    Repo.all(User)
+  def list_users(params) do
+    base_query()
+    |> build_query(params)
+    |> Repo.all()
   end
 
   @doc """
@@ -100,5 +102,24 @@ defmodule Homework.Users do
   """
   def change_user(%User{} = user, attrs \\ %{}) do
     User.changeset(user, attrs)
+  end
+
+  # Originally I just shoehorned the possible filter parameters into the query and provided default values,
+  # but this solution feels like awesome, idiomatic Elixir.
+  # From: https://elixirschool.com/blog/ecto-query-composition/
+  defp base_query do
+    from u in User
+  end
+
+  defp build_query(query, criteria) do
+    Enum.reduce(criteria, query, &compose_query/2)
+  end
+
+  defp compose_query({:first_name, first_name}, query) do
+    where(query, [u], ilike(u.first_name, ^"%#{first_name}%"))
+  end
+
+  defp compose_query({:last_name, last_name}, query) do
+    where(query, [u], ilike(u.last_name, ^"%#{last_name}%"))
   end
 end
