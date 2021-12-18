@@ -7,6 +7,7 @@ defmodule Homework.Merchants do
   alias Homework.Repo
 
   alias Homework.Merchants.Merchant
+  alias Homework.Util.Paginator
 
   @doc """
   Returns the list of merchants.
@@ -21,6 +22,15 @@ defmodule Homework.Merchants do
     base_query()
     |> build_query(params)
     |> Repo.all()
+  end
+
+  def list_paged_merchants(params) do
+    {:ok, res, page_info} =
+    base_query()
+    |> build_query(params)
+    |> Paginator.page(params)
+
+    Paginator.finalize(res, page_info)
   end
 
   @doc """
@@ -114,5 +124,9 @@ defmodule Homework.Merchants do
 
   defp compose_query({:name, name}, query) do
     where(query, [m], ilike(m.name, ^"%#{name}%"))
+  end
+
+  defp compose_query(_bad_param, query) do
+    query
   end
 end

@@ -10,6 +10,13 @@ defmodule HomeworkWeb.Resolvers.UsersResolver do
   end
 
   @doc """
+    Get a paginated list of users
+  """
+  def users_paged(_root, args, _info) do
+    {:ok, Users.list_users_paged(args)}
+  end
+
+  @doc """
   Get the company associated with a user
   """
   def company(_root, _args, %{source: %{company_id: company_id}}) do

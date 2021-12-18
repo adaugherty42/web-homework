@@ -18,11 +18,29 @@ defmodule HomeworkWeb.Schema do
       resolve(&TransactionsResolver.transactions/3)
     end
 
+    @desc "Get paged Transactions"
+    field(:transactions_paged, :transactions_paged) do
+      arg(:min_amount, :decimal)
+      arg(:max_amount, :decimal)
+      arg(:page, non_null(:integer))
+      arg(:page_size, non_null(:integer))
+      resolve(&TransactionsResolver.transactions_paged/3)
+    end
+
     @desc "Get all Users"
     field(:users, list_of(:user)) do
       arg(:first_name, :string)
       arg(:last_name, :string)
       resolve(&UsersResolver.users/3)
+    end
+
+    @desc "Get paged Users"
+    field(:users_paged, :users_paged) do
+      arg(:first_name, :string)
+      arg(:last_name, :string)
+      arg(:page, non_null(:integer))
+      arg(:page_size, non_null(:integer))
+      resolve(&UsersResolver.users_paged/3)
     end
 
     @desc "Get all Merchants"
@@ -31,9 +49,26 @@ defmodule HomeworkWeb.Schema do
       resolve(&MerchantsResolver.merchants/3)
     end
 
+    @desc "Get paged Merchants"
+    field(:merchants_paged, :merchants_paged) do
+      arg(:name, :string)
+      arg(:page, non_null(:integer))
+      arg(:page_size, non_null(:integer))
+      resolve(&MerchantsResolver.merchants_paged/3)
+    end
+
     @desc "Get all Companies"
     field(:companies, list_of(:company)) do
+      arg(:name, :string)
       resolve(&CompaniesResolver.companies/3)
+    end
+
+    @desc "Get paged Companies"
+    field(:companies_paged, :companies_paged) do
+      arg(:name, :string)
+      arg(:page, non_null(:integer))
+      arg(:page_size, non_null(:integer))
+      resolve(&CompaniesResolver.companies_paged/3)
     end
   end
 

@@ -15,6 +15,11 @@ defmodule HomeworkWeb.Schemas.UsersSchema do
     field(:updated_at, :naive_datetime)
   end
 
+  object :users_paged do
+    field(:total_rows, :integer)
+    field(:entries, list_of(:user))
+  end
+
   object :user_mutations do
     @desc "Create a new user"
     field :create_user, :user do

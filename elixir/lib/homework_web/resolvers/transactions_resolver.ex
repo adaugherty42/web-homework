@@ -12,6 +12,13 @@ defmodule HomeworkWeb.Resolvers.TransactionsResolver do
   end
 
   @doc """
+    Get a paginated list of transactions
+  """
+  def transactions_paged(_root, args, _info) do
+    {:ok, Transactions.list_transactions_paged(args)}
+  end
+
+  @doc """
   Get the user associated with a transaction
   """
   def user(_root, _args, %{source: %{user_id: user_id}}) do

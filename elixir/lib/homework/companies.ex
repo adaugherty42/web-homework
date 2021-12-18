@@ -7,10 +7,29 @@ defmodule Homework.Companies do
   alias Homework.Repo
   alias Homework.Companies.Company
   alias Homework.Util.Transforms
+  alias Homework.Util.Paginator
 
+  @doc """
+    Returns a list of companies
+  """
   def list_companies(_args) do
-    Repo.all(from c in Company, preload: [:transactions])
+    Repo.all(from c in Company)
     |> Enum.map(&process_company/1)
+  end
+
+  @doc """
+    Returns a paged list of companies
+  """
+  def list_companies_paged(params) do
+    {:ok, results, page_info} =
+      base_query()
+      |> build_query(params)
+      |> Paginator.page(params)
+
+      results =
+        results
+        |> Enum.map(&process_company/1)
+      Paginator.finalize(results, page_info)
   end
 
   @doc """
@@ -20,7 +39,6 @@ defmodule Homework.Companies do
   """
   def get_company!(id) do
     Repo.get!(Company, id)
-    |> Repo.preload([:transactions])
     |> process_company()
   end
 
@@ -37,7 +55,6 @@ defmodule Homework.Companies do
         {code, res}
       :ok ->
         {code, res
-              |> Repo.preload([:transactions])
               |> process_company()}
     end
   end
@@ -56,7 +73,6 @@ defmodule Homework.Companies do
 
       :ok ->
         {code, res
-              |> Repo.preload([:transactions])
               |> process_company()}
     end
   end
@@ -83,6 +99,7 @@ defmodule Homework.Companies do
 
   defp process_company(company) do
     company
+    |> Repo.preload([:transactions])
     |> (fn(c) -> %{c| transactions: Enum.map(c.transactions, fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end)} end).()
     |> (fn(c) -> %{c| credit_line: Transforms.cents_to_dollars(c.credit_line)} end).()
     |> calculate_available_credit()
@@ -98,5 +115,21 @@ defmodule Homework.Companies do
     # Credit line is already a decimal at this point
     diff = Decimal.sub(amt, txs_sum)
     %{company| available_credit: diff}
+  end
+
+  defp base_query do
+    from c in Company
+  end
+
+  defp build_query(query, criteria) do
+    Enum.reduce(criteria, query, &compose_query/2)
+  end
+
+  defp compose_query({:name, name}, query) do
+    where(query, [c], ilike(c.name, ^"%#{name}%"))
+  end
+
+  defp compose_query(_bad_param, query) do
+    query
   end
 end

@@ -8,6 +8,10 @@ defmodule HomeworkWeb.Resolvers.MerchantsResolver do
     {:ok, Merchants.list_merchants(args)}
   end
 
+  def merchants_paged(_root, args, _info) do
+    {:ok, Merchants.list_paged_merchants(args)}
+  end
+
   @doc """
   Create a new merchant
   """

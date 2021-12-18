@@ -9,6 +9,7 @@ defmodule Homework.Transactions do
   alias Homework.Transactions.Transaction
   alias Homework.Companies
   alias Homework.Util.Transforms
+  alias Homework.Util.Paginator
 
   @doc """
   Returns the list of transactions.
@@ -24,6 +25,15 @@ defmodule Homework.Transactions do
     |> build_query(params)
     |> Repo.all
     |> Enum.map(fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end)
+  end
+
+  def list_transactions_paged(params) do
+    {:ok, results, page_info} =
+      base_query()
+      |> Paginator.page(params)
+
+    results = Enum.map(results, fn(t) -> %{t| amount: Transforms.cents_to_dollars(t.amount)} end)
+    Paginator.finalize(results, page_info)
   end
 
   @doc """
@@ -185,5 +195,9 @@ defmodule Homework.Transactions do
   defp compose_query({:max_amount, max_amount}, query) do
     amt = Transforms.dollars_to_cents(max_amount)
     where(query, [t], ^amt >= t.amount)
+  end
+
+  defp compose_query(_bad_param, query) do
+    query
   end
 end

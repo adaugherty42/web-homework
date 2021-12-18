@@ -16,6 +16,11 @@ defmodule HomeworkWeb.Schemas.CompaniesSchema do
     field(:updated_at, :naive_datetime)
   end
 
+  object :companies_paged do
+    field(:total_rows, :integer)
+    field(:entries, list_of(:company))
+  end
+
   object :company_mutations do
     @desc "Create a new company"
     field :create_company, :company do

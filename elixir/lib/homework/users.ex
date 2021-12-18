@@ -7,6 +7,7 @@ defmodule Homework.Users do
   alias Homework.Repo
 
   alias Homework.Users.User
+  alias Homework.Util.Paginator
 
   @doc """
   Returns the list of users.
@@ -21,6 +22,18 @@ defmodule Homework.Users do
     base_query()
     |> build_query(params)
     |> Repo.all()
+  end
+
+  @doc """
+    Returns a paginated list of users.
+  """
+  def list_users_paged(params) do
+    {:ok, results, page_info} =
+      base_query()
+      |> build_query(params)
+      |> Paginator.page(params)
+
+      Paginator.finalize(results, page_info)
   end
 
   @doc """
@@ -121,5 +134,9 @@ defmodule Homework.Users do
 
   defp compose_query({:last_name, last_name}, query) do
     where(query, [u], ilike(u.last_name, ^"%#{last_name}%"))
+  end
+
+  defp compose_query(_bad_param, query) do
+    query
   end
 end

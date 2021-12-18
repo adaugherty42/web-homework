@@ -9,6 +9,13 @@ defmodule HomeworkWeb.Resolvers.CompaniesResolver do
     {:ok, res}
   end
 
+  @doc """
+    Get a paged list of companies
+  """
+  def companies_paged(_root, args, _info) do
+    {:ok, Companies.list_companies_paged(args)}
+  end
+
   def create_company(_root, args, _info) do
     case Companies.create_company(args) do
       {:ok, company} ->
