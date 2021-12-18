@@ -14,6 +14,9 @@ defmodule Homework.TransactionsTest do
       {:ok, company1} =
         Companies.create_company(%{name: "some company", credit_line: Decimal.from_float(500.00)})
 
+      {:ok, company2} =
+        Companies.create_company(%{name: "some other company", credit_line: Decimal.from_float(40.00)})
+
       {:ok, merchant1} =
         Merchants.create_merchant(%{description: "some description", name: "some name"})
 
@@ -59,6 +62,26 @@ defmodule Homework.TransactionsTest do
         company_id: company1.id
       }
 
+      insufficient_funds_attrs = %{
+        amount: Decimal.from_float(550.00),
+        credit: true,
+        debit: true,
+        description: "some description",
+        merchant_id: merchant1.id,
+        user_id: user1.id,
+        company_id: company1.id
+      }
+
+      insufficient_funds_update_attrs = %{
+        amount: Decimal.from_float(43.00),
+        credit: false,
+        debit: false,
+        description: "some updated description",
+        merchant_id: merchant2.id,
+        user_id: user2.id,
+        company_id: company2.id
+      }
+
       invalid_attrs = %{
         amount: nil,
         credit: nil,
@@ -73,6 +96,8 @@ defmodule Homework.TransactionsTest do
        %{
          valid_attrs: valid_attrs,
          update_attrs: update_attrs,
+         insufficient_funds_attrs: insufficient_funds_attrs,
+         insufficient_funds_update_attrs: insufficient_funds_update_attrs,
          invalid_attrs: invalid_attrs,
          merchant1: merchant1,
          merchant2: merchant2,
@@ -123,6 +148,13 @@ defmodule Homework.TransactionsTest do
       assert {:error, %Ecto.Changeset{}} = Transactions.create_transaction(invalid_attrs)
     end
 
+    test "create_transaction/1 fails when the company does not have sufficient credit availabie", %{
+      insufficient_funds_attrs: insufficient_funds_attrs
+    } do
+      assert {:error, "could not create transaction: company has insufficient available balance"} =
+              Transactions.create_transaction(insufficient_funds_attrs)
+    end
+
     test "update_transaction/2 with valid data updates the transaction", %{
       valid_attrs: valid_attrs,
       update_attrs: update_attrs,
@@ -154,6 +186,24 @@ defmodule Homework.TransactionsTest do
                Transactions.update_transaction(transaction, invalid_attrs)
 
       assert transaction == Transactions.get_transaction!(transaction.id)
+    end
+
+    test "update_transaction/2 fails when the amount is changed to exceed the company's available credit", %{
+      valid_attrs: valid_attrs,
+      insufficient_funds_attrs: insufficient_funds_attrs
+    } do
+      transaction = transaction_fixture(valid_attrs)
+      assert {:error, "could not update transaction: company has insufficient available balance"} =
+              Transactions.update_transaction(transaction, insufficient_funds_attrs)
+    end
+
+    test "update_transaction/2 fails when the company is switched to a company with insufficient credit", %{
+      valid_attrs: valid_attrs,
+      insufficient_funds_update_attrs: insufficient_funds_update_attrs
+    } do
+      transaction = transaction_fixture(valid_attrs)
+      assert {:error, "could not update transaction: company has insufficient available balance"} =
+              Transactions.update_transaction(transaction, insufficient_funds_update_attrs)
     end
 
     test "delete_transaction/1 deletes the transaction", %{valid_attrs: valid_attrs} do
